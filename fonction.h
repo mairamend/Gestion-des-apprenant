@@ -4,7 +4,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <ctype.h>
+#include <termios.h>
+#include <time.h>
 //Definition des structures
 typedef struct 
 {
@@ -36,48 +37,71 @@ User SaisiIdentifiant();
 int connexion(User);
 void afficherMenuadmin();
 void afficherMenuapprenant();
-
+void marquerpresenceEtudiant(char []);
+void recupChaine(char [],char []);
+Etudiant verifietudiant(Etudiant[],int,char[]);
+int recuplisteEtudiant(Etudiant [],int );
+int ecrisListepresence(Etudiant );
+int siEnapasemarge(Etudiant E[],int nbres,Etudiant e1);
 //definitions des fonctions
+void recupChaine(char chaine[],char msg[]) 
+{
+    printf("%s\n",msg);
+    do {
+        
+        fgets(chaine, 50, stdin);
+        size_t len = strlen(chaine);
+        if (len > 0 && chaine[len - 1] == '\n') 
+        {
+            
+            chaine[len - 1] = '\0';
+        }
+    } while (strlen(chaine) == 0 );
+}
+void saisiMdp(char pass[])
+{
+    int j = 0;
+    do
+    {
+    printf("\nMot de passe : ");
+    struct termios oldt, newt;
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ECHO); // Masquer les caractères saisis
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
+    while (1) {
+        char c = getchar(); // Lire un caractère sans l'afficher
+
+        if (c == '\r' || c == '\n') // Si l'utilisateur appuie sur Entrée
+            break;
+
+        pass[j] = c; // Stocker le caractère dans le mot de passe
+        printf("*"); // Afficher une étoile à l'écran
+        j++;
+    }
+    printf("\n");
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt); // Restaurer les paramètres d'origine
+    pass[j] = '\0'; // Terminer la chaîne de caractères
+    if (j==0)
+    {
+        puts("Le mot de pass est obligatoire");
+    }
+    
+    } while (j==0);
+    
+}
+
 User SaisiIdentifiant()
 {
         User u1;
-        int space;
+        char login[50];
+        char pass[20];
         puts("Entrer votre login et mot de pass ");
-        
-       do
-        {
-             puts("Login");
-             fgets(u1.nameuser, sizeof(u1.nameuser), stdin);
-             size_t len = strlen(u1.nameuser);
-            if (len > 0 && u1.nameuser[len - 1] == '\n') 
-            {
-                u1.nameuser[len - 1] = '\0';
-            }
-            if (len==0)
-            {
-                puts("Le login est obligatoire");
-            }
-            
-        
-        }while(strlen(u1.nameuser)==0);
-        do
-        {
-            puts("Mot de pass");
-            //fgets(u1.mdp, sizeof(u1.mdp), stdin);
-            strncpy(u1.mdp, getpass(""), sizeof(u1.mdp) - 1);
-             size_t len = strlen(u1.mdp);
-              u1.mdp[sizeof(u1.mdp) - 1] = '\0';
-            if (len > 0 && u1.mdp[len - 1] == '\n') 
-            {
-                u1.mdp[len - 1] = '\0';
-                
-            }
-             if (len==0 && u1.mdp[len - 1] == '\n')
-            {
-               puts("Le mot de pass est obligatoire");
-            }
-            
-        }while(strlen(u1.mdp)==0);  
+       recupChaine(login,"Login");
+       saisiMdp(pass);
+       strcpy(u1.nameuser,login);
+       strcpy(u1.mdp,pass);
         return u1;
 }
 int connexion(User u1)
@@ -143,44 +167,116 @@ int connexion(User u1)
         scanf("%d",&choice);
     } while (choice!=1 && choice!=2 && choice!=1 && choice!=3 && choice!=4 &&choice!=5);
 }
-void marquerpresence()
-{
-    int choix;
-    Etudiant e;
-    puts("Pour Marquer presence entrer la classe");
-    puts("1- Dev Data");
-    puts("2- Dev web");
-    puts("3- Ref dig");
-    do
-    {
-        scanf("%d",&choix);
-    } while (choix!=1 && choix!=2 &&choix!=3);
-    switch (choix)
-    {
-    case 1:
-      do
-        {
-             puts("Entrer la matricule pour marquer la presence");
-             fgets(e.mat, sizeof(e.mat), stdin);
-             size_t len = strlen(e.mat);
-            if (len > 0 && e.mat[len - 1] == '\n') 
-            {
-                e.mat[len - 1] = '\0';
-            }
-            if (len==0)
-            {
-                puts("La matricule est obligatoire");
-            }
-         
-        }while(strlen(e.mat)==0);
-        break;
-    case 2:
-        break;
-    default:
-        break;
-    }
 
+void marquerpresenceEtudiant(char matricule[])
+{
+        Etudiant e1;
+    int maxE = 300;
+    Etudiant E[maxE],E1[maxE];
+    
+    int nbres;
+    
+    recupChaine(matricule,"");
+     nbres=recuplisteEtudiant(E,maxE);
+    e1=verifietudiant(E,nbres,matricule);
+    if (siEnapasemarge(E1,maxE,e1)==1)
+    {
+        ecrisListepresence(e1);
+        
+    }
+    else
+    {
+        puts("Vous avez deja emarger");
+        
+    }   
+    
+} 
+Etudiant verifietudiant(Etudiant E[],int nbres,char matricule[])
+{
+    Etudiant e1;
+    int ct=0;
+    for (int i = 0; i < nbres; i++)
+      {
+        if  (strcmp(matricule, E[i].mat) == 0)
+        { 
+            strcpy(e1.mat, E[i].mat);
+            strcpy(e1.nom, E[i].nom);
+            strcpy(e1.prenom, E[i].prenom);
+            strcpy(e1.classe, E[i].classe);
+           return e1;
+           ct++; 
+        } 
+      }   
+
+        if(ct==0 && strcmp(matricule,"q")!=0)
+            printf("Vous ne faite pas parti de l'ecole, ou votre matricules est incorect\n");
+
+}    
+int siEnapasemarge(Etudiant E[],int nbres,Etudiant e1)
+{
+    
+    
+    int cmptE=0;
+    FILE *fichierSortie; 
+    fichierSortie = fopen("listepresences.txt", "r");
+
+    if (fichierSortie == NULL) {
+        perror("Erreur lors de l'ouverture du fichier d'entrée");
+        return 1;
+    }
+       
+     while(fscanf(fichierSortie, "%s %s %s %s",E[cmptE].mat, E[cmptE].nom, E[cmptE].prenom, E[cmptE].classe)!=EOF)
+     {
+        cmptE++;
+     }
+     for (int i = 0; i <= cmptE; i++)
+      {
+        if  (strcmp(e1.mat, E[i].mat) != 0)
+        { 
+            return 1;//l'etudiant n'a pas encore emarger
+        } 
+        else
+        return 0;
+      }  
+     
+    fclose(fichierSortie);
+}
+int ecrisListepresence(Etudiant e1)
+{
+    FILE *fichierSortie; 
+    fichierSortie = fopen("listepresences.txt", "a");
+
+    if (fichierSortie == NULL) {
+        perror("Erreur lors de l'ouverture du fichier d'entrée");
+        return 1;
+    }
+            time_t heuredemarquage = time(NULL);
+            struct tm *tempsLocal = localtime(&heuredemarquage);
+            fprintf(fichierSortie, "\n%s %s %s %s %s %02d:%02d:%02d\n", e1.mat,e1.nom,e1.prenom,e1.classe,"present",tempsLocal->tm_hour, tempsLocal->tm_min, tempsLocal->tm_sec);
+    
+       
+    
+    fclose(fichierSortie);   
 }
 
- #endif 
+int recuplisteEtudiant(Etudiant E[],int nbres)
+{
+     int cmptE = 0;   
+    FILE *fichierEntree;
+    
+     fichierEntree = fopen("listeetudiant.txt", "r");
+    if (fichierEntree == NULL) {
+        perror("Erreur lors de l'ouverture du fichier d'entrée");
+        return 1;
+    }
+    while(fscanf(fichierEntree, "%s %s %s %s",E[cmptE].mat, E[cmptE].nom, E[cmptE].prenom, E[cmptE].classe)!=EOF)
+    {
+        
+       cmptE++;
+    }
+    fclose(fichierEntree);
+    nbres=cmptE;
+    return nbres;
+}
+#endif 
    
